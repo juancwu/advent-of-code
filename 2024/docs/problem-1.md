@@ -26,3 +26,7 @@ Keep track of the distance between a pair,
 and add the distances together.
 
 Question: What is the total distance betwen the lists?
+
+Part 2
+
+Input are reports and each line is a report where levels are separated by spaces.
