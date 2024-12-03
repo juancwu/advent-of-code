@@ -1,8 +1,16 @@
 const std = @import("std");
 
+pub fn main() !void {
+    const input = @embedFile("inputs/02.txt");
+    const result_part1 = try solvePart1(input);
+    std.debug.print("Day 02 result part 1: {}\n", .{result_part1});
+    const result_part2 = try solvePart2(input);
+    std.debug.print("Day 02 result part 2: {}\n", .{result_part2});
+}
+
 pub fn solvePart1(input: []const u8) !i32 {
-    const allocater = std.heap.page_allocator;
-    const reports = try processInput(allocater, input);
+    const allocator = std.heap.page_allocator;
+    const reports = try processInput(allocator, input);
     defer {
         for (reports.items) |item| {
             item.deinit();
@@ -10,18 +18,9 @@ pub fn solvePart1(input: []const u8) !i32 {
         reports.deinit();
     }
 
-    // need a state to know which direction we are going
-
-    // no number starts with 0
-    // smallest in the input
-    // assuming that all reports have at least 2 levels
-    var direction: i32 = -1;
     var count: i32 = 0;
-    // loop through each line and check numbers are
-    // increasing/decreasing
     for (reports.items) |report| {
-        direction = checkArrayOrder(report);
-        if (direction == 1 or direction == -1) {
+        if (isValidSequence(report.items, null)) {
             count += 1;
         }
     }
@@ -30,8 +29,8 @@ pub fn solvePart1(input: []const u8) !i32 {
 }
 
 pub fn solvePart2(input: []const u8) !i32 {
-    const allocater = std.heap.page_allocator;
-    const reports = try processInput(allocater, input);
+    const allocator = std.heap.page_allocator;
+    const reports = try processInput(allocator, input);
     defer {
         for (reports.items) |item| {
             item.deinit();
@@ -39,19 +38,21 @@ pub fn solvePart2(input: []const u8) !i32 {
         reports.deinit();
     }
 
-    // need a state to know which direction we are going
-
-    // no number starts with 0
-    // smallest in the input
-    // assuming that all reports have at least 2 levels
-    var direction: i32 = -1;
     var count: i32 = 0;
-    // loop through each line and check numbers are
-    // increasing/decreasing
     for (reports.items) |report| {
-        direction = checkArrayOrder(report);
-        if (direction == 1 or direction == -1) {
+        // check without removing numbers
+        if (isValidSequence(report.items, null)) {
             count += 1;
+            continue;
+        }
+
+        var i: usize = 0;
+        var found_valid = false;
+        while (i < report.items.len and !found_valid) : (i += 1) {
+            if (isValidSequence(report.items, i)) {
+                count += 1;
+                found_valid = true;
+            }
         }
     }
 
@@ -59,51 +60,36 @@ pub fn solvePart2(input: []const u8) !i32 {
 }
 
 fn isValidSequence(items: []const i32, skip_index: ?usize) bool {
-    var prev_index: ?usize = null;
-    var inc: ?bool = null;
+    if (items.len <= 1) return true;
 
-    var i: usize = 0;
-    while (i < items.len) : (i += 1) {
+    var filtered_items = std.ArrayList(i32).init(std.heap.page_allocator);
+    defer filtered_items.deinit();
+
+    for (items, 0..) |item, i| {
         if (skip_index != null and i == skip_index.?) {
             continue;
         }
-        if (prev_index != null) {
-            const prev = items[prev_index.?];
-            const curr = items[i];
-            const diff = if (curr > prev) curr - prev else prev - curr;
-            if (diff < 1 or diff > 3) {
-                return false;
-            }
-            const is_inc = curr > prev;
-            if (inc == null) {
-                inc = is_inc;
-            } else if (inc.? != is_inc) {
-                // sudden change in direction
-                return false;
-            }
-        }
-        prev_index = i;
+        filtered_items.append(item) catch return false;
     }
+
+    const list = filtered_items.items;
+    if (list.len < 2) return true;
+
+    const first_diff = list[1] - list[0];
+    if (first_diff == 0) return false;
+    const is_increasing = first_diff > 0;
+
+    var i: usize = 0;
+    while (i < list.len - 1) : (i += 1) {
+        const diff = list[i + 1] - list[i];
+
+        if (is_increasing and diff <= 0) return false;
+        if (!is_increasing and diff >= 0) return false;
+
+        if (@abs(diff) < 1 or @abs(diff) > 3) return false;
+    }
+
     return true;
-}
-
-fn checkArrayOrder(list: std.ArrayList(i32)) i32 {
-    if (list.items.len <= 1) return 0;
-
-    if (isValidSequence(list.items, null)) {
-        return if (list.items[0] < list.items[list.items.len - 1]) 1 else -1;
-    }
-
-    var i: usize = 1;
-    while (i < list.items.len) : (i += 1) {
-        if (isValidSequence(list.items, i)) {
-            const first = if (i == 0) list.items[1] else list.items[0];
-            const last = if (i == list.items.len - 1) list.items[list.items.len - 2] else list.items[list.items.len - 1];
-            return if (first < last) 1 else -1;
-        }
-    }
-
-    return 0;
 }
 
 fn processInput(allocator: std.mem.Allocator, input: []const u8) !std.ArrayList(std.ArrayList(i32)) {
@@ -133,4 +119,17 @@ test "day02 part 1 - test data" {
     ;
     const result = try solvePart1(test_input);
     try std.testing.expectEqual(@as(i32, 2), result);
+}
+
+test "day02 part 2 - test data" {
+    const test_input =
+        \\7 6 4 2 1
+        \\1 2 7 8 9
+        \\9 7 6 2 1
+        \\1 3 2 4 5
+        \\8 6 4 4 1
+        \\1 3 6 7 9
+    ;
+    const result = try solvePart2(test_input);
+    try std.testing.expectEqual(@as(i32, 4), result);
 }
