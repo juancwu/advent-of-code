@@ -2,8 +2,14 @@ const std = @import("std");
 
 const Data = struct {
     arr: std.ArrayList(u8),
-    cols: isize,
-    rows: isize,
+    cols: usize,
+    rows: usize,
+};
+
+const Position = struct {
+    x: usize,
+    y: usize,
+    valid: bool,
 };
 
 // Direction struct to represent movement in the grid
@@ -16,11 +22,6 @@ const Direction = enum {
     UpLeft,
     DownRight,
     DownLeft,
-};
-
-const Position = struct {
-    x: isize,
-    y: isize,
 };
 
 const directions: [8]Direction = [8]Direction{
@@ -39,37 +40,37 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     const data = try processInput(allocator, input);
     defer data.arr.deinit();
-    const count = findXmasSequences(data);
-    std.debug.print("xmas count: {}\n", .{count});
+    const part1 = solvePart1(data.arr.items, data.rows, data.cols);
+    std.debug.print("part 1: {}\n", .{part1});
 }
 
-pub fn findXmasSequences(data: Data) !u32 {
-    // a word can only count if its all in one direction.
+pub fn solvePart1(input: []const u8, rows: usize, cols: usize) u32 {
     var count: u32 = 0;
 
-    var idx: isize = 0;
-    var c: u8 = 0;
-    var i: isize = 0;
-    var j: isize = 0;
-    while (i < data.rows) : (i += 1) {
-        j = 0;
-        while (j < data.cols) : (j += 1) {
-            idx = i * data.cols + j;
-            c = data.arr.items[@as(usize, @intCast(idx))];
-            if (c == 'X') {
-                // look at all 8 directions
+    var idx: usize = 0;
+    var ch: u8 = 0;
+    var sequence: [4]u8 = [4]u8{ '-', '-', '-', '-' };
+    const to_match: [4]u8 = [4]u8{ 'X', 'M', 'A', 'S' };
+    var pos: Position = Position{ .x = 0, .y = 0, .valid = true };
+    for (0..rows) |i| {
+        for (0..cols) |j| {
+            idx = i * cols + j;
+            ch = input[idx];
+            if (ch == 'X') {
                 for (directions) |dir| {
-                    var k: isize = 1;
-                    var position: Position = getNewPosition(i, j, dir);
-                    var is_correct = true;
-                    while (k < 4 and isInBound(data.rows, data.cols, position.y, position.x) and is_correct) : (k += 1) {
-                        std.debug.print("k: {}\n", .{k});
-                        const index: isize = position.y * data.cols + position.x;
-                        is_correct = isExpectedChar(k, data.arr.items[@as(usize, @intCast(index))]);
-                        position = getNewPosition(position.y, position.x, dir);
+                    sequence[0] = ch;
+                    pos = getPositionByDir(dir, rows, cols, i, j);
+                    var k: usize = 1;
+                    while (pos.valid and k < 4) : (k += 1) {
+                        sequence[k] = input[pos.y * cols + pos.x];
+                        // std.debug.print("d: {}, s: {s}, p: {}\n", .{ dir, sequence, pos });
+                        pos = getPositionByDir(dir, rows, cols, pos.y, pos.x);
                     }
-                    if (is_correct) {
-                        count += 1;
+                    if (matchSequence(&sequence, &to_match)) {
+                        count = count + 1;
+                    }
+                    for (0..4) |p| {
+                        sequence[p] = '-';
                     }
                 }
             }
@@ -79,74 +80,78 @@ pub fn findXmasSequences(data: Data) !u32 {
     return count;
 }
 
-fn getNewPosition(row: isize, col: isize, dir: Direction) Position {
+fn getPositionByDir(dir: Direction, rows: usize, cols: usize, row: usize, col: usize) Position {
+    var pos: Position = Position{
+        .x = 0,
+        .y = 0,
+        .valid = false,
+    };
+
     switch (dir) {
         .Up => {
-            return Position{
-                .x = col,
-                .y = row - 1,
-            };
+            if (row == 0) return pos;
+            pos.y = row - 1;
+            pos.x = col;
         },
         .Down => {
-            return Position{
-                .x = col,
-                .y = row + 1,
-            };
-        },
-        .Right => {
-            return Position{
-                .x = col + 1,
-                .y = row,
-            };
+            if (row == rows - 1) return pos;
+            pos.y = row + 1;
+            pos.x = col;
         },
         .Left => {
-            return Position{
-                .x = col - 1,
-                .y = row,
-            };
+            if (col == 0) return pos;
+            pos.y = row;
+            pos.x = col - 1;
+        },
+        .Right => {
+            if (col == cols - 1) return pos;
+            pos.y = row;
+            pos.x = col + 1;
         },
         .UpRight => {
-            return Position{
-                .x = col + 1,
-                .y = row - 1,
-            };
+            if (row == 0 or col == cols - 1) return pos;
+            pos.y = row - 1;
+            pos.x = col + 1;
         },
         .UpLeft => {
-            return Position{
-                .x = col - 1,
-                .y = row - 1,
-            };
+            if (row == 0 or col == 0) return pos;
+            pos.y = row - 1;
+            pos.x = col - 1;
         },
         .DownRight => {
-            return Position{
-                .x = col + 1,
-                .y = row + 1,
-            };
+            if (row == rows - 1 or col == cols - 1) return pos;
+            pos.y = row + 1;
+            pos.x = col + 1;
         },
         .DownLeft => {
-            return Position{
-                .x = col - 1,
-                .y = row + 1,
-            };
+            if (row == rows - 1 or col == 0) return pos;
+            pos.y = row + 1;
+            pos.x = col - 1;
         },
     }
+
+    pos.valid = true;
+    return pos;
 }
 
-fn isExpectedChar(k: isize, char: u8) bool {
-    if (k == 1 and char == 'M') return true;
-    if (k == 2 and char == 'A') return true;
-    if (k == 3 and char == 'S') return true;
-    return false;
+fn matchSequence(sequence: []u8, to_match: []const u8) bool {
+    if (sequence.len != 4 or to_match.len != 4 or sequence.len != to_match.len) return false;
+
+    for (0..4) |i| {
+        if (sequence[i] != to_match[i]) return false;
+    }
+
+    return true;
 }
 
-fn isInBound(rows: isize, cols: isize, row: isize, col: isize) bool {
+fn isInBound(rows: usize, cols: usize, row: usize, col: usize) bool {
     return 0 <= row and row < rows and 0 <= col and col < cols;
 }
 
 fn processInput(allocator: std.mem.Allocator, input: []const u8) !Data {
     var data = std.ArrayList(u8).init(allocator);
-    var rows: isize = 1;
-    var cols: isize = 0;
+    var rows: usize = 1;
+    var cols: usize = 0;
     var stop_counting_cols: bool = false;
 
     for (input) |c| {
@@ -160,8 +165,10 @@ fn processInput(allocator: std.mem.Allocator, input: []const u8) !Data {
     }
 
     // adjust for trainling newline
-    if (input.len > 0 and input[input.len - 1] == '\n') {
+    if (rows > 140) {
         rows -= 1;
+        try data.resize(rows * cols);
+        std.debug.print("A: {}, r: {}, c: {}, l: {}\n", .{ rows * cols, rows, cols, data.items.len });
     }
 
     return Data{
@@ -187,6 +194,6 @@ test "Day 04 part 1" {
     const allocator = std.heap.page_allocator;
     const data = try processInput(allocator, input);
     defer data.arr.deinit();
-    const count = try findXmasSequences(data);
+    const count = solvePart1(data.arr.items, data.rows, data.cols);
     try std.testing.expectEqual(18, count);
 }
