@@ -42,6 +42,8 @@ pub fn main() !void {
     defer data.arr.deinit();
     const part1 = solvePart1(data.arr.items, data.rows, data.cols);
     std.debug.print("part 1: {}\n", .{part1});
+    const part2 = solvePart2(data.arr.items, data.rows, data.cols);
+    std.debug.print("part 2: {}\n", .{part2});
 }
 
 pub fn solvePart1(input: []const u8, rows: usize, cols: usize) u32 {
@@ -73,6 +75,74 @@ pub fn solvePart1(input: []const u8, rows: usize, cols: usize) u32 {
                         sequence[p] = '-';
                     }
                 }
+            }
+        }
+    }
+
+    return count;
+}
+
+pub fn solvePart2(input: []const u8, rows: usize, cols: usize) u32 {
+    var count: u32 = 0;
+
+    var idx: usize = 0;
+    var ch: u8 = 0;
+    var pos: Position = Position{ .x = 0, .y = 0, .valid = true };
+    var a: u8 = 0;
+    var b: u8 = 0;
+    for (0..rows) |i| {
+        for (0..cols) |j| {
+            idx = i * cols + j;
+            ch = input[idx];
+            if (ch == 'A') {
+                // make sure all four corners are not A or X
+                pos = getPositionByDir(Direction.UpRight, rows, cols, i, j);
+                if (!pos.valid or input[pos.y * cols + pos.x] == 'A' or input[pos.y * cols + pos.x] == 'X') {
+                    continue;
+                }
+                pos = getPositionByDir(Direction.UpLeft, rows, cols, i, j);
+                if (!pos.valid or input[pos.y * cols + pos.x] == 'A' or input[pos.y * cols + pos.x] == 'X') {
+                    continue;
+                }
+                pos = getPositionByDir(Direction.DownRight, rows, cols, i, j);
+                if (!pos.valid or input[pos.y * cols + pos.x] == 'A' or input[pos.y * cols + pos.x] == 'X') {
+                    continue;
+                }
+                pos = getPositionByDir(Direction.DownLeft, rows, cols, i, j);
+                if (!pos.valid or input[pos.y * cols + pos.x] == 'A' or input[pos.y * cols + pos.x] == 'X') {
+                    continue;
+                }
+
+                // make sure that diagonals are not the same character
+                pos = getPositionByDir(Direction.UpRight, rows, cols, i, j);
+                if (!pos.valid) {
+                    continue;
+                }
+                a = input[pos.y * cols + pos.x];
+                pos = getPositionByDir(Direction.DownLeft, rows, cols, i, j);
+                if (!pos.valid) {
+                    continue;
+                }
+                b = input[pos.y * cols + pos.x];
+                if (a == b) {
+                    continue;
+                }
+
+                pos = getPositionByDir(Direction.UpLeft, rows, cols, i, j);
+                if (!pos.valid) {
+                    continue;
+                }
+                a = input[pos.y * cols + pos.x];
+                pos = getPositionByDir(Direction.DownRight, rows, cols, i, j);
+                if (!pos.valid) {
+                    continue;
+                }
+                b = input[pos.y * cols + pos.x];
+                if (a == b) {
+                    continue;
+                }
+
+                count += 1;
             }
         }
     }
@@ -196,4 +266,24 @@ test "Day 04 part 1" {
     defer data.arr.deinit();
     const count = solvePart1(data.arr.items, data.rows, data.cols);
     try std.testing.expectEqual(18, count);
+}
+
+test "Day 04 part 2" {
+    const input =
+        \\MMMSXXMASM
+        \\MSAMXMSMSA
+        \\AMXSXMAAMM
+        \\MSAMASMSMX
+        \\XMASAMXAMM
+        \\XXAMMXXAMA
+        \\SMSMSASXSS
+        \\SAXAMASAAA
+        \\MAMMMXMMMM
+        \\MXMXAXMASX
+    ;
+    const allocator = std.heap.page_allocator;
+    const data = try processInput(allocator, input);
+    defer data.arr.deinit();
+    const count = solvePart2(data.arr.items, data.rows, data.cols);
+    try std.testing.expectEqual(9, count);
 }
