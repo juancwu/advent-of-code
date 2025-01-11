@@ -5,25 +5,14 @@ const Data = struct {
     updates: std.ArrayList(std.ArrayList(u32)),
 };
 
-pub fn solvePart1(input: []const u8) !u32 {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+const Part1Result = struct {
+    sum: u32,
+    invalids: std.ArrayList(std.ArrayList(u32)),
+};
 
-    var data = try processInput(allocator, input);
-    defer {
-        var it = data.rules.valueIterator();
-        while (it.next()) |list| {
-            list.deinit();
-        }
-        data.rules.deinit();
-        for (data.updates.items) |list| {
-            list.deinit();
-        }
-        data.updates.deinit();
-    }
-
+pub fn solvePart1(allocator: std.mem.Allocator, data: Data) !Part1Result {
     var sumOfMidNum: u32 = 0;
+    var invalids: std.ArrayList(std.ArrayList(u32)) = std.ArrayList(std.ArrayList(u32)).init(allocator);
     for (data.updates.items) |list| {
         var is_valid = true;
         var seen = std.AutoHashMap(u32, void).init(allocator);
@@ -46,10 +35,19 @@ pub fn solvePart1(input: []const u8) !u32 {
         if (is_valid) {
             const mid_idx = list.items.len / 2;
             sumOfMidNum += list.items[mid_idx];
+        } else {
+            var list_clone: std.ArrayList(u32) = std.ArrayList(u32).init(allocator);
+            for (list.items) |num| {
+                try list_clone.append(num);
+            }
+            try invalids.append(list_clone);
         }
     }
 
-    return sumOfMidNum;
+    return Part1Result{
+        .sum = sumOfMidNum,
+        .invalids = invalids,
+    };
 }
 
 fn processInput(allocator: std.mem.Allocator, input: []const u8) !Data {
@@ -141,12 +139,54 @@ test "day05 solution part 1 - test data" {
         \\61,13,29
         \\97,13,75,29,47
     ;
-    const sum = try solvePart1(test_input);
-    std.debug.print("sum: {d}\n", .{sum});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    var data = try processInput(allocator, test_input);
+    defer {
+        var it = data.rules.valueIterator();
+        while (it.next()) |list| {
+            list.deinit();
+        }
+        data.rules.deinit();
+        for (data.updates.items) |list| {
+            list.deinit();
+        }
+        data.updates.deinit();
+    }
+    const result = try solvePart1(allocator, data);
+    defer {
+        for (result.invalids.items) |list| {
+            list.deinit();
+        }
+        result.invalids.deinit();
+    }
+    std.debug.print("sum: {d}\n", .{result.sum});
 }
 
 test "day05 solution part 1 - actual data" {
     const input = @embedFile("inputs/05.txt");
-    const sum = try solvePart1(input);
-    std.debug.print("sum: {d}\n", .{sum});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    var data = try processInput(allocator, input);
+    defer {
+        var it = data.rules.valueIterator();
+        while (it.next()) |list| {
+            list.deinit();
+        }
+        data.rules.deinit();
+        for (data.updates.items) |list| {
+            list.deinit();
+        }
+        data.updates.deinit();
+    }
+    const result = try solvePart1(allocator, data);
+    defer {
+        for (result.invalids.items) |list| {
+            list.deinit();
+        }
+        result.invalids.deinit();
+    }
+    std.debug.print("sum: {d}\n", .{result.sum});
 }
